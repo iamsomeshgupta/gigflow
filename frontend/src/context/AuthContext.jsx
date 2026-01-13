@@ -16,6 +16,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // if token exists from previous session, set header
+    const savedToken = localStorage.getItem('token');
+    if (savedToken) axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
     checkAuth();
   }, []);
 
@@ -40,6 +43,11 @@ export const AuthProvider = ({ children }) => {
         { withCredentials: true }
       );
       setUser(response.data.user);
+      if (response.data.token) {
+        const token = response.data.token;
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        localStorage.setItem('token', token);
+      }
       return { success: true };
     } catch (error) {
       return {
@@ -57,6 +65,11 @@ export const AuthProvider = ({ children }) => {
         { withCredentials: true }
       );
       setUser(response.data.user);
+      if (response.data.token) {
+        const token = response.data.token;
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        localStorage.setItem('token', token);
+      }
       return { success: true };
     } catch (error) {
       return {
@@ -70,6 +83,8 @@ export const AuthProvider = ({ children }) => {
     try {
       await axios.post('/api/auth/logout', {}, { withCredentials: true });
       setUser(null);
+      delete axios.defaults.headers.common['Authorization'];
+      localStorage.removeItem('token');
     } catch (error) {
       console.error('Logout error:', error);
     }
