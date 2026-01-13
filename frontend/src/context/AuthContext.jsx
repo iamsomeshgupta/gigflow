@@ -16,7 +16,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // if token exists from previous session, set header
     const savedToken = localStorage.getItem('token');
     if (savedToken) axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
     checkAuth();

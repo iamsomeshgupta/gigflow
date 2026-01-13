@@ -182,10 +182,6 @@ npm run build
 
 The build output will be in `frontend/dist/`
 
-## Environment Variables
-
-See `.env.example` files in both backend and frontend directories for required environment variables.
-
 ## License
 
 ISC

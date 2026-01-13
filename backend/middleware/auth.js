@@ -4,7 +4,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
 
 export const authenticate = (req, res, next) => {
   try {
-    // support token from cookie or Authorization header (Bearer)
     let token = null;
     if (req.cookies && req.cookies.token) token = req.cookies.token;
     const authHeader = req.headers.authorization || req.headers.Authorization;
