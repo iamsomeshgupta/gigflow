@@ -68,10 +68,13 @@ npm install
 3. Create a `.env` file in the backend directory:
 ```env
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/gigflow
-JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
 NODE_ENV=development
+MONGODB_URI=mongodb://localhost:27017/gigflow
+JWT_SECRET=your_super_secret_random_string_here
+JWT_EXPIRES_IN=7d
+CLIENT_URL=http://localhost:5173
 FRONTEND_URL=http://localhost:5173
+
 ```
 
 4. Start the backend server:
