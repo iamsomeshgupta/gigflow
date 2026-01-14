@@ -77,62 +77,88 @@ router.get('/:gigId', authenticate, async (req, res) => {
 });
 
 router.patch('/:bidId/hire', authenticate, async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  let session = null;
+  let useTransaction = false;
+
+  // Try to start a session/transaction. If server is a standalone MongoDB
+  // (no replica set) transactions are not supported — fall back to non-transactional updates.
+  try {
+    session = await mongoose.startSession();
+    session.startTransaction();
+    useTransaction = true;
+  } catch (err) {
+    // couldn't start transaction (likely standalone server). Proceed without transaction.
+    if (session) {
+      try { session.endSession(); } catch (e) {}
+      session = null;
+    }
+    useTransaction = false;
+  }
 
   try {
     const { bidId } = req.params;
 
-    const bid = await Bid.findById(bidId).session(session);
+    const bid = useTransaction
+      ? await Bid.findById(bidId).session(session)
+      : await Bid.findById(bidId);
     if (!bid) {
-      await session.abortTransaction();
+      if (useTransaction && session) await session.abortTransaction();
       return res.status(404).json({ message: 'Bid not found' });
     }
 
-    const gig = await Gig.findById(bid.gigId).session(session);
+    const gig = useTransaction
+      ? await Gig.findById(bid.gigId).session(session)
+      : await Gig.findById(bid.gigId);
     if (!gig) {
-      await session.abortTransaction();
+      if (useTransaction && session) await session.abortTransaction();
       return res.status(404).json({ message: 'Gig not found' });
     }
 
     if (gig.ownerId.toString() !== req.user.userId) {
-      await session.abortTransaction();
+      if (useTransaction && session) await session.abortTransaction();
       return res.status(403).json({ message: 'Only the gig owner can hire freelancers' });
     }
 
     if (gig.status !== 'open') {
-      await session.abortTransaction();
+      if (useTransaction && session) await session.abortTransaction();
       return res.status(400).json({ message: 'Gig is no longer open' });
     }
 
     if (bid.status !== 'pending') {
-      await session.abortTransaction();
+      if (useTransaction && session) await session.abortTransaction();
       return res.status(400).json({ message: 'Bid is no longer pending' });
     }
 
-    await Gig.findByIdAndUpdate(
-      gig._id,
-      { status: 'assigned' },
-      { session }
-    );
+    if (useTransaction) {
+      await Gig.findByIdAndUpdate(
+        gig._id,
+        { status: 'assigned' },
+        { session }
+      );
 
-    await Bid.findByIdAndUpdate(
-      bidId,
-      { status: 'hired' },
-      { session }
-    );
+      await Bid.findByIdAndUpdate(
+        bidId,
+        { status: 'hired' },
+        { session }
+      );
 
-    await Bid.updateMany(
-      {
-        gigId: gig._id,
-        _id: { $ne: bidId },
-        status: 'pending'
-      },
-      { status: 'rejected' },
-      { session }
-    );
+      await Bid.updateMany(
+        {
+          gigId: gig._id,
+          _id: { $ne: bidId },
+          status: 'pending'
+        },
+        { status: 'rejected' },
+        { session }
+      );
+    } else {
+      // fall back to sequential updates when transactions are unavailable
+      await Gig.findByIdAndUpdate(gig._id, { status: 'assigned' });
+      await Bid.findByIdAndUpdate(bidId, { status: 'hired' });
+      await Bid.updateMany({ gigId: gig._id, _id: { $ne: bidId }, status: 'pending' }, { status: 'rejected' });
+    }
 
-    await session.commitTransaction();
+    if (useTransaction) await session.commitTransaction();
 
     const updatedBid = await Bid.findById(bidId)
       .populate('freelancerId', 'name email')
@@ -153,10 +179,15 @@ router.patch('/:bidId/hire', authenticate, async (req, res) => {
       bid: updatedBid
     });
   } catch (error) {
-    await session.abortTransaction();
+    if (useTransaction && session) {
+      try { await session.abortTransaction(); } catch (e) {}
+    }
+    console.error('Error in /bids/:bidId/hire:', error);
     res.status(500).json({ message: error.message });
   } finally {
-    session.endSession();
+    if (session) {
+      try { session.endSession(); } catch (e) {}
+    }
   }
 });
 

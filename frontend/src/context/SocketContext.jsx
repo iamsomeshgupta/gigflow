@@ -17,9 +17,11 @@ export const SocketProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const { user } = useAuth();
 
+  const serverUrl = process.env.CLIENT_URL
+
   useEffect(() => {
     if (user) {
-      const newSocket = io('http://localhost:5000', {
+      const newSocket = io(serverUrl, {
         withCredentials: true
       });
 
